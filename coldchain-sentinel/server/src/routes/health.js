@@ -12,13 +12,15 @@ const esp32Service = require('../services/esp32Service');
 
 // GET /api/health
 router.get('/health', (req, res) => {
+  const dbHealth = store.checkHealth();
   res.json({
     success: true,
-    status: 'ok',
+    status: dbHealth.available ? 'ok' : 'degraded',
     uptime: Math.round((Date.now() - startTime) / 1000),
     timestamp: new Date().toISOString(),
     simulatorRunning: simulatorService.isRunning(),
     esp32Status: esp32Service.getStatus(),
+    storage: dbHealth,
     connectedClients: getConnectedCount(),
   });
 });
@@ -29,6 +31,7 @@ router.get('/status', (req, res) => {
   const esp32State = esp32Service.getStatus();
   const simulatorActive = simulatorService.isRunning();
   const shipments = store.getShipments();
+  const dbHealth = store.checkHealth();
 
   res.json({
     success: true,
@@ -55,7 +58,13 @@ router.get('/status', (req, res) => {
         status: simulatorService.getStatus(),
       },
       dataSource: esp32State.dataSource,
-      database: { type: 'json-file', shipments: shipments.length },
+      database: {
+        type: 'sqlite',
+        available: dbHealth.available,
+        path: dbHealth.path,
+        sizeBytes: dbHealth.sizeBytes,
+        shipments: shipments.length,
+      },
       connectedWebSocketClients: getConnectedCount(),
     },
   });

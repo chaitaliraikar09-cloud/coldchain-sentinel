@@ -13,6 +13,7 @@ import AlertsPage from './pages/AlertsPage';
 import CheckpointsPage from './pages/CheckpointsPage';
 import SensorDataPage from './pages/SensorDataPage';
 import SettingsPage from './pages/SettingsPage';
+import ReportsPage from './pages/ReportsPage';
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="alerts" element={<AlertsPage />} />
             <Route path="checkpoints" element={<CheckpointsPage />} />
             <Route path="sensor-data" element={<SensorDataPage />} />
+            <Route path="reports" element={<ReportsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/overview" replace />} />

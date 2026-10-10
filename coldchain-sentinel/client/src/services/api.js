@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -17,6 +17,7 @@ api.interceptors.response.use(
 
 export const healthApi = {
   getHealth: () => api.get('/health'),
+  getRootHealth: () => axios.get('http://localhost:5001/health').then(r => r.data),
   getStatus: () => api.get('/status'),
   setDataSource: (source) => api.post('/status/datasource', { source }),
   setEsp32Host: (host, port) => api.post('/status/esp32-host', { host, port }),
@@ -28,6 +29,16 @@ export const shipmentsApi = {
   getHistory: (id, limit = 200) => api.get(`/shipments/${id}/history?limit=${limit}`),
   create: (data) => api.post('/shipments', data),
   update: (id, data) => api.patch(`/shipments/${id}`, data),
+  verify: (id, data) => api.post(`/shipments/${id}/verify`, data),
+};
+
+export const reportsApi = {
+  getAll: (params = {}) => api.get('/reports', { params }),
+  generate: (data) => api.post('/reports/generate', data),
+  getDownloadUrl: (id) => `${API_BASE}/reports/${id}/download`,
+  download: (id) => {
+    window.open(`${API_BASE}/reports/${id}/download`, '_blank');
+  },
 };
 
 export const readingsApi = {

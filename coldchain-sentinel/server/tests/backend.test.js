@@ -399,3 +399,174 @@ describe('ESP32 Live Ingestion & Air Quality Excursions', () => {
     }
   });
 });
+
+// ────────────────────────────────────────
+// Root Health Check & Storage Diagnostic
+// ────────────────────────────────────────
+describe('GET /health (Root health check endpoint)', () => {
+  it('confirms backend is running on port 5001 with local SQLite persistence available', async () => {
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(res.body.port).toBe(5001);
+    expect(res.body.storage).toBeDefined();
+    expect(res.body.storage.type).toBe('sqlite');
+    expect(res.body.storage.available).toBe(true);
+    expect(res.body.storage.path).toMatch(/vaxiverify\.db/);
+    expect(typeof res.body.storage.sizeBytes).toBe('number');
+  });
+});
+
+// ────────────────────────────────────────
+// SQLite Local Data Persistence & Deduplication
+// ────────────────────────────────────────
+describe('Local SQLite Data Persistence & Deduplication', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const database = require('../src/db/database');
+
+  it('persists readings into SQLite and survives restarts', async () => {
+    const testReading = {
+      id: 'RDG-PERSIST-001',
+      shipmentId: 'VAX-001',
+      deviceId: 'ESP32-PERSIST',
+      sensorId: 'TEMP-001',
+      temperature: 4.8,
+      humidity: 52.0,
+      air_quality_aqi: 35,
+      timestamp: '99s',
+      serverReceivedAt: new Date().toISOString(),
+    };
+
+    // Insert reading via store
+    const inserted = store.addReading(testReading);
+    expect(inserted).toBeDefined();
+
+    // Query directly from database
+    const fetched = database.getReadingById('RDG-PERSIST-001');
+    expect(fetched).not.toBeNull();
+    expect(fetched.temperature).toBe(4.8);
+    expect(fetched.humidity).toBe(52.0);
+    expect(fetched.air_quality_aqi).toBe(35);
+
+    // Verify DB file exists on disk
+    const health = database.checkHealth();
+    expect(health.available).toBe(true);
+    expect(fs.existsSync(health.path)).toBe(true);
+    expect(health.sizeBytes).toBeGreaterThan(0);
+  });
+
+  it('prevents duplicate records when device retries same reading', async () => {
+    const initialCount = database.countReadings({ shipmentId: 'VAX-001' });
+
+    const retryReading = {
+      id: 'RDG-RETRY-001',
+      shipmentId: 'VAX-001',
+      deviceId: 'ESP32-RETRY',
+      temperature: 5.1,
+      timestamp: '120s',
+      dedupKey: 'VAX-001_ESP32-RETRY_120s',
+    };
+
+    // First attempt
+    store.addReading(retryReading);
+
+    // Second attempt (identical dedup key)
+    store.addReading({
+      ...retryReading,
+      id: 'RDG-RETRY-002', // different client ID but same device timestamp
+    });
+
+    const readingsWithDedup = database.getReadings({ shipmentId: 'VAX-001' })
+      .filter(r => r.deviceId === 'ESP32-RETRY');
+
+    expect(readingsWithDedup.length).toBe(1);
+  });
+});
+
+// ────────────────────────────────────────
+// Report Generation & Arrival Verification
+// ────────────────────────────────────────
+describe('Report Generation & Arrival Verification', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const reportService = require('../src/services/reportService');
+
+  it('generates CSV telemetry report and saves to ./reports/', async () => {
+    const res = await request(app)
+      .post('/api/reports/generate')
+      .send({ shipmentId: 'VAX-001', type: 'CSV', generatedBy: 'Test Auditor' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.type).toBe('CSV');
+    expect(res.body.data.filename).toMatch(/VAX-001_telemetry_.*\.csv/);
+
+    const filepath = res.body.data.filepath;
+    expect(fs.existsSync(filepath)).toBe(true);
+
+    const content = fs.readFileSync(filepath, 'utf8');
+    expect(content).toContain('reading_id,shipment_id,device_id');
+    expect(content).toContain('VAX-001');
+    expect(content).toContain('telemetry_classification');
+  });
+
+  it('generates PDF summary audit report and saves to ./reports/', async () => {
+    const res = await request(app)
+      .post('/api/reports/generate')
+      .send({ shipmentId: 'VAX-001', type: 'PDF', generatedBy: 'Dr. Test' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.type).toBe('PDF');
+    expect(res.body.data.filename).toMatch(/VAX-001_verification_.*\.pdf/);
+
+    const filepath = res.body.data.filepath;
+    expect(fs.existsSync(filepath)).toBe(true);
+    const stats = fs.statSync(filepath);
+    expect(stats.size).toBeGreaterThan(1000); // Valid PDF with content
+  });
+
+  it('GET /api/reports returns list of generated reports with metadata', async () => {
+    const res = await request(app).get('/api/reports');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeGreaterThanOrEqual(2);
+    expect(res.body.reportsDir).toBeDefined();
+  });
+
+  it('POST /api/shipments/:id/verify finalizes arrival and generates reports', async () => {
+    const res = await request(app)
+      .post('/api/shipments/VAX-001/verify')
+      .send({
+        verificationStatus: 'VERIFIED',
+        inspectionNotes: 'Seals verified intact. VVM acceptable.',
+        verifiedBy: 'Pharmacist Sharma',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.status).toBe('DELIVERED');
+    expect(res.body.data.verificationStatus).toBe('VERIFIED');
+    expect(res.body.data.verifiedBy).toBe('Pharmacist Sharma');
+    expect(res.body.reports).toBeDefined();
+    expect(res.body.reports.csv).toBeDefined();
+    expect(res.body.reports.pdf).toBeDefined();
+  });
+
+  it('GET /api/reports/:id/download securely downloads generated report', async () => {
+    const reportsList = await request(app).get('/api/reports?shipmentId=VAX-001');
+    const firstReport = reportsList.body.data[0];
+
+    const res = await request(app).get(`/api/reports/${firstReport.id}/download`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toContain(firstReport.filename);
+  });
+
+  it('blocks path traversal attacks on report download', async () => {
+    const res = await request(app).get('/api/reports/file/..%2F..%2Fpackage.json');
+    expect(res.status).toBe(400);
+  });
+});
+

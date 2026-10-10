@@ -1,12 +1,14 @@
+const path = require('path');
 require('dotenv').config();
 
 const config = {
-  port: parseInt(process.env.PORT) || 5000,
+  port: parseInt(process.env.PORT) || 5001,
   clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
   deviceApiKey: process.env.DEVICE_API_KEY || 'change-this-development-key',
   simulatorIntervalMs: parseInt(process.env.SIMULATOR_INTERVAL_MS) || 2000,
   staleReadingTimeoutMs: parseInt(process.env.STALE_READING_TIMEOUT_MS) || 10000,
-  dataDir: process.env.DATA_DIR || './data',
+  dataDir: process.env.DATA_DIR || path.resolve(__dirname, '../../data'),
+  reportsDir: process.env.REPORTS_DIR || path.resolve(__dirname, '../../../reports'),
   maxReadingHistory: parseInt(process.env.MAX_READING_HISTORY) || 500,
   nodeEnv: process.env.NODE_ENV || 'development',
   dataSource: process.env.DATA_SOURCE || 'esp32',
@@ -18,3 +20,4 @@ const config = {
 };
 
 module.exports = config;
+

@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Truck, BarChart3, AlertTriangle,
-  MapPin, Database, Settings, Thermometer, ChevronLeft, ChevronRight, LogOut, Shield
+  MapPin, Database, Settings, Thermometer, ChevronLeft, ChevronRight, LogOut, Shield, FileText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { path: '/alerts', label: 'Alerts & Incidents', icon: AlertTriangle },
   { path: '/checkpoints', label: 'Checkpoints', icon: MapPin },
   { path: '/sensor-data', label: 'Sensor Data', icon: Database },
+  { path: '/reports', label: 'Audit Reports', icon: FileText },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 

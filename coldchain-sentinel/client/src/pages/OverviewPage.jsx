@@ -183,7 +183,7 @@ export default function OverviewPage() {
           <AlertTriangle size={18} className="text-rose-600 flex-shrink-0" />
           <div>
             <p className="text-sm font-semibold text-rose-800">Dashboard Disconnected</p>
-            <p className="text-xs text-rose-600">Not receiving live data. Ensure the backend server is running on port 5000.</p>
+            <p className="text-xs text-rose-600">Not receiving live data. Ensure the backend server is running on port 5001.</p>
           </div>
         </div>
       )}

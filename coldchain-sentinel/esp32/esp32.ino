@@ -38,8 +38,9 @@
 const char* WIFI_SSID     = "YOUR_WIFI_SSID";
 const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
-// Backend API - use your computer's LAN IP address (e.g. http://10.168.234.115:5000)
-const char* API_BASE_URL  = "http://10.168.234.115:5000";
+// Backend API - use your computer's LAN IP address (e.g. http://10.168.234.115:5001)
+const char* API_BASE_URL  = "http://10.168.234.115:5001";
+
 
 // Device credentials - matches DEVICE_API_KEY in server/.env
 const char* DEVICE_API_KEY = "change-this-development-key";

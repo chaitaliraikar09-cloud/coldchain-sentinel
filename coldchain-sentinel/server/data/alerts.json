@@ -65,7 +65,7 @@
     "message": "Temperature 0°C below min 2°C (deviation: -2.0°C)",
     "recommendedAction": "Check insulation and heating, move to controlled environment",
     "createdAt": "2026-10-09T13:44:19.141Z",
-    "updatedAt": "2026-10-10T03:05:11.859Z",
+    "updatedAt": "2026-10-10T03:29:08.594Z",
     "readingId": "RDG-TEST"
   },
   {
@@ -98,7 +98,7 @@
     "message": "Temperature 10°C exceeds max 8°C (deviation: +2.0°C)",
     "recommendedAction": "Immediately move to refrigerated storage or nearest checkpoint",
     "createdAt": "2026-10-09T13:44:19.160Z",
-    "updatedAt": "2026-10-10T03:05:11.883Z",
+    "updatedAt": "2026-10-10T03:29:08.617Z",
     "readingId": "R1"
   },
   {
@@ -230,16 +230,17 @@
     "shipmentId": "SHP-TEST",
     "type": "TEMP_HIGH",
     "severity": "MODERATE",
-    "status": "ACTIVE",
-    "temperature": 11,
+    "status": "RESOLVED",
+    "temperature": 10,
     "threshold": 8,
     "deviation": 3,
     "durationMinutes": 0,
     "message": "Temperature 11°C exceeds max 8°C (deviation: +3.0°C)",
     "recommendedAction": "Immediately move to refrigerated storage or nearest checkpoint",
     "createdAt": "2026-10-10T03:05:11.863Z",
-    "updatedAt": "2026-10-10T03:05:11.863Z",
-    "readingId": "RDG-TEST"
+    "updatedAt": "2026-10-10T03:29:08.595Z",
+    "readingId": "RDG-TEST",
+    "resolvedAt": "2026-10-10T03:29:08.595Z"
   },
   {
     "id": "ALT-8B097EA8",
@@ -279,7 +280,7 @@
     "shipmentId": "VAX-001",
     "type": "TEMP_HIGH",
     "severity": "CRITICAL",
-    "status": "ACTIVE",
+    "status": "RESOLVED",
     "temperature": 29.7,
     "threshold": 8,
     "deviation": 21.5,
@@ -287,7 +288,57 @@
     "message": "Temperature 29.5°C exceeds max 8°C (deviation: +21.5°C)",
     "recommendedAction": "Immediately move to refrigerated storage or nearest checkpoint",
     "createdAt": "2026-10-10T03:08:07.480Z",
-    "updatedAt": "2026-10-10T03:08:41.687Z",
-    "readingId": "RDG-93E58C6A"
+    "updatedAt": "2026-10-10T03:29:08.585Z",
+    "readingId": "RDG-93E58C6A",
+    "resolvedAt": "2026-10-10T03:29:08.585Z"
+  },
+  {
+    "id": "ALT-37E27E15",
+    "shipmentId": "SHP-TEST",
+    "type": "TEMP_HIGH",
+    "severity": "MODERATE",
+    "status": "ACTIVE",
+    "temperature": 11,
+    "threshold": 8,
+    "deviation": 3,
+    "durationMinutes": 0,
+    "message": "Temperature 11°C exceeds max 8°C (deviation: +3.0°C)",
+    "recommendedAction": "Immediately move to refrigerated storage or nearest checkpoint",
+    "createdAt": "2026-10-10T03:29:08.597Z",
+    "updatedAt": "2026-10-10T03:29:08.597Z",
+    "readingId": "RDG-TEST"
+  },
+  {
+    "id": "ALT-B7F1FBE8",
+    "shipmentId": "VAX-001",
+    "type": "TEMP_HIGH",
+    "severity": "CRITICAL",
+    "status": "RESOLVED",
+    "temperature": 32.1,
+    "threshold": 8,
+    "deviation": 24.1,
+    "durationMinutes": 0,
+    "message": "Temperature 32.1°C exceeds max 8°C (deviation: +24.1°C)",
+    "recommendedAction": "Immediately move to refrigerated storage or nearest checkpoint",
+    "createdAt": "2026-10-10T03:29:08.628Z",
+    "updatedAt": "2026-10-10T03:29:08.640Z",
+    "readingId": "RDG-36FB617A",
+    "resolvedAt": "2026-10-10T03:29:08.640Z"
+  },
+  {
+    "id": "ALT-36047A99",
+    "shipmentId": "VAX-001",
+    "type": "AIR_QUALITY_HIGH",
+    "severity": "CRITICAL",
+    "status": "RESOLVED",
+    "airQualityAqi": 155,
+    "aqi": 155,
+    "threshold": 100,
+    "message": "Air quality index 145 exceeds threshold of 100",
+    "recommendedAction": "Inspect seal, storage enclosure, and ventilation for particulate or chemical ingress",
+    "createdAt": "2026-10-10T03:29:08.640Z",
+    "updatedAt": "2026-10-10T03:29:08.666Z",
+    "readingId": "RDG-329EA1E7",
+    "resolvedAt": "2026-10-10T03:29:08.666Z"
   }
 ]

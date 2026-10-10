@@ -71,19 +71,85 @@ router.post('/', shipmentValidation, (req, res) => {
   res.status(201).json({ success: true, data: shipment });
 });
 
+const reportService = require('../services/reportService');
+const { getIO } = require('../utils/socketEmitter');
+
 // PATCH /api/shipments/:id
-router.patch('/:id', (req, res) => {
+router.patch('/:id', async (req, res) => {
   const shipment = store.getShipmentById(req.params.id);
   if (!shipment) return res.status(404).json({ success: false, error: 'Shipment not found' });
 
-  const allowedFields = ['name', 'product', 'origin', 'destination', 'tempMin', 'tempMax', 'humidityMin', 'humidityMax', 'notes', 'status', 'estimatedArrival'];
+  const allowedFields = [
+    'name', 'product', 'origin', 'destination', 'tempMin', 'tempMax',
+    'humidityMin', 'humidityMax', 'notes', 'status', 'estimatedArrival',
+    'verificationStatus', 'inspectionNotes', 'verifiedBy', 'verifiedAt'
+  ];
   const updates = {};
   for (const f of allowedFields) {
     if (req.body[f] !== undefined) updates[f] = req.body[f];
   }
 
   const updated = store.upsertShipment({ ...shipment, ...updates, updatedAt: new Date().toISOString() });
+
+  // Auto-generate reports if marked completed/delivered
+  if (updates.status === 'DELIVERED' || updates.status === 'COMPLETED') {
+    try {
+      await reportService.generateAllReports(shipment.id, updates.verifiedBy || 'System');
+    } catch (e) {
+      console.error('[shipments] Auto report generation warning:', e.message);
+    }
+  }
+
   res.json({ success: true, data: updated });
 });
 
+// POST /api/shipments/:id/verify - Arrival verification and inspection sign-off
+router.post('/:id/verify', async (req, res) => {
+  const shipment = store.getShipmentById(req.params.id);
+  if (!shipment) return res.status(404).json({ success: false, error: 'Shipment not found' });
+
+  const {
+    verificationStatus = 'VERIFIED',
+    inspectionNotes = '',
+    verifiedBy = 'Receiving Pharmacist',
+    status = 'DELIVERED',
+  } = req.body;
+
+  const now = new Date().toISOString();
+  const updated = store.upsertShipment({
+    ...shipment,
+    status,
+    verificationStatus,
+    inspectionNotes,
+    verifiedBy,
+    verifiedAt: now,
+    updatedAt: now,
+  });
+
+  // Automatically generate both CSV and PDF reports
+  let reports = null;
+  try {
+    reports = await reportService.generateAllReports(shipment.id, verifiedBy);
+  } catch (repErr) {
+    console.error('[shipments] Auto-report generation warning:', repErr.message);
+  }
+
+  // Socket notification
+  try {
+    const io = getIO();
+    if (io) {
+      io.emit('shipment:verified', { shipment: updated, reports });
+      io.emit('shipment:updated', updated);
+    }
+  } catch (_) {}
+
+  res.json({
+    success: true,
+    message: 'Shipment arrival verification recorded and audit reports generated',
+    data: updated,
+    reports,
+  });
+});
+
 module.exports = router;
+

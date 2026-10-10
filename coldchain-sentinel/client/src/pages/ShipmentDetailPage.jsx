@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Thermometer, Droplets, Battery, MapPin, AlertTriangle, CheckCircle, Clock, Cpu, Wind } from 'lucide-react';
-import { shipmentsApi, alertsApi, checkpointsApi, healthApi } from '../services/api';
+import {
+  ArrowLeft, Thermometer, Droplets, Battery, MapPin, AlertTriangle,
+  CheckCircle, Clock, Cpu, Wind, FileText, Download, FileSpreadsheet, Shield
+} from 'lucide-react';
+import { shipmentsApi, alertsApi, checkpointsApi, healthApi, reportsApi } from '../services/api';
 import { getSocket } from '../services/socket';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
@@ -19,6 +22,12 @@ export default function ShipmentDetailPage() {
   const [shipment, setShipment] = useState(null);
   const [history, setHistory] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [verifyModal, setVerifyModal] = useState(false);
+  const [inspectionNotes, setInspectionNotes] = useState('Container seals verified intact. VVM indicator color acceptable.');
+  const [inspectorName, setInspectorName] = useState('Receiving Pharmacist');
+  const [verificationOutcome, setVerificationOutcome] = useState('VERIFIED');
   const [nearestCheckpoint, setNearestCheckpoint] = useState(null);
   const [esp32Status, setEsp32Status] = useState({ connected: false, reachable: false, isStale: false });
   const [loading, setLoading] = useState(true);
@@ -26,14 +35,16 @@ export default function ShipmentDetailPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [shipRes, histRes, alertRes] = await Promise.all([
+      const [shipRes, histRes, alertRes, repRes] = await Promise.allSettled([
         shipmentsApi.getById(id),
         shipmentsApi.getHistory(id, 200),
         alertsApi.getAll({ shipmentId: id }),
+        reportsApi.getAll({ shipmentId: id }),
       ]);
-      setShipment(shipRes.data);
-      setHistory(histRes.data || []);
-      setAlerts(alertRes.data || []);
+      if (shipRes.status === 'fulfilled') setShipment(shipRes.value.data);
+      if (histRes.status === 'fulfilled') setHistory(histRes.value.data || []);
+      if (alertRes.status === 'fulfilled') setAlerts(alertRes.value.data || []);
+      if (repRes.status === 'fulfilled') setReports(repRes.value.data || []);
 
       // Load health/status for ESP32 tracking
       healthApi.getStatus().then(res => {
@@ -102,6 +113,39 @@ export default function ShipmentDetailPage() {
     } catch (e) {}
   };
 
+  const handleGenerateReport = async (type) => {
+    setGeneratingReport(true);
+    try {
+      await reportsApi.generate({ shipmentId: id, type, generatedBy: inspectorName });
+      const repRes = await reportsApi.getAll({ shipmentId: id });
+      setReports(repRes.data || []);
+    } catch (e) {
+      alert(`Report generation failed: ${e.message}`);
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    setGeneratingReport(true);
+    try {
+      const res = await shipmentsApi.verify(id, {
+        verificationStatus: verificationOutcome,
+        inspectionNotes,
+        verifiedBy: inspectorName,
+        status: 'DELIVERED',
+      });
+      setShipment(res.data);
+      const repRes = await reportsApi.getAll({ shipmentId: id });
+      setReports(repRes.data || []);
+      setVerifyModal(false);
+    } catch (e) {
+      alert(`Verification failed: ${e.message}`);
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full spinner" />
@@ -135,31 +179,63 @@ export default function ShipmentDetailPage() {
   return (
     <div className="space-y-6 animate-slide-in">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link to="/shipments" className="p-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-all shadow-2xs">
-          <ArrowLeft size={18} />
-        </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{shipment.id}</h1>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold border tracking-wide ${
-              isStale ? 'bg-amber-50 text-amber-700 border-amber-200' :
-              shipment.excursionActive ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            }`}>
-              {isStale ? `STALE / OFFLINE (${lastKnownTimeStr || 'Awaiting'})` : shipment.excursionActive ? 'EXCURSION ACTIVE' : 'NORMAL'}
-            </span>
-            {latestReading?.source === 'simulator' && (
-              <span className="px-2.5 py-1 rounded-full text-xs bg-slate-100 text-slate-700 border border-slate-200 font-medium">
-                Simulator Data
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+        <div className="flex items-center gap-4">
+          <Link to="/shipments" className="p-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-all shadow-2xs">
+            <ArrowLeft size={18} />
+          </Link>
+          <div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{shipment.id}</h1>
+              <span className={`px-3 py-1 rounded-full text-xs font-bold border tracking-wide ${
+                isStale ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                shipment.excursionActive ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}>
+                {isStale ? `STALE / OFFLINE (${lastKnownTimeStr || 'Awaiting'})` : shipment.excursionActive ? 'EXCURSION ACTIVE' : 'NORMAL'}
               </span>
-            )}
-            {latestReading?.source === 'esp32' && (
-              <span className="px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
-                ESP32 Device
-              </span>
-            )}
+              {latestReading?.source === 'simulator' && (
+                <span className="px-2.5 py-1 rounded-full text-xs bg-slate-100 text-slate-700 border border-slate-200 font-medium">
+                  Simulator Data
+                </span>
+              )}
+              {latestReading?.source === 'esp32' && (
+                <span className="px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
+                  ESP32 Device
+                </span>
+              )}
+            </div>
+            <p className="text-slate-500 text-sm mt-1">{shipment.product} · {shipment.origin} → {shipment.destination}</p>
           </div>
-          <p className="text-slate-500 text-sm mt-1">{shipment.product} · {shipment.origin} → {shipment.destination}</p>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => handleGenerateReport('CSV')}
+            disabled={generatingReport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all shadow-2xs"
+            title="Generate and download raw telemetry CSV"
+          >
+            <FileSpreadsheet size={14} className="text-emerald-600" />
+            CSV Log
+          </button>
+          <button
+            onClick={() => handleGenerateReport('PDF')}
+            disabled={generatingReport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-xs"
+            title="Generate clinical verification summary PDF"
+          >
+            <FileText size={14} />
+            PDF Report
+          </button>
+          <button
+            onClick={() => setVerifyModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-xs"
+            title="Sign off arrival verification"
+          >
+            <Shield size={14} />
+            Verify Arrival
+          </button>
         </div>
       </div>
 
@@ -378,6 +454,132 @@ export default function ShipmentDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Audit Reports Card */}
+      <div className="clean-card overflow-hidden">
+        <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText size={18} className="text-blue-600" />
+            <h3 className="text-sm font-bold text-slate-900">Locally Generated Audit Reports ({reports.length})</h3>
+          </div>
+          <span className="text-xs text-slate-500 font-medium">Persisted in ./reports/</span>
+        </div>
+        <div className="p-5">
+          {reports.length === 0 ? (
+            <div className="text-center py-6 border border-dashed border-slate-200 rounded-xl">
+              <p className="text-xs text-slate-500">No reports generated for this shipment yet.</p>
+              <p className="text-[11px] text-slate-400 mt-1">Use the "CSV Log" or "PDF Report" buttons in the top header to generate.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {reports.map(rep => (
+                <div key={rep.id} className="py-3 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {rep.type === 'PDF' ? (
+                      <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0">
+                        <FileText size={16} />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                        <FileSpreadsheet size={16} />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-mono font-semibold text-slate-900 truncate" title={rep.filename}>{rep.filename}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Generated {new Date(rep.generatedAt).toLocaleString()} by {rep.generatedBy || 'System'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => reportsApi.download(rep.id)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold text-xs transition-all flex-shrink-0 border border-blue-200/60"
+                  >
+                    <Download size={13} />
+                    Download
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Arrival Verification Modal */}
+      {verifyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-slate-200 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Shield size={18} className="text-emerald-600" />
+                <h3 className="text-sm font-bold text-slate-900">Finalize Arrival Verification</h3>
+              </div>
+              <button
+                onClick={() => setVerifyModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Sign off physical arrival inspection for <strong>{shipment.id}</strong>. This updates status to Delivered and automatically generates official CSV and PDF audit reports.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Verification Status</label>
+                <select
+                  value={verificationOutcome}
+                  onChange={(e) => setVerificationOutcome(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
+                >
+                  <option value="VERIFIED">VERIFIED - Seals Intact & Temperature Compliant</option>
+                  <option value="ACCEPTED_WITH_EXCURSION">ACCEPTED WITH OBSERVATION - Minor Excursion Noted</option>
+                  <option value="REJECTED">REJECTED - Cold-Chain Breached / Packaging Compromised</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Inspector Name & ID</label>
+                <input
+                  type="text"
+                  value={inspectorName}
+                  onChange={(e) => setInspectorName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Physical Inspection Notes</label>
+                <textarea
+                  rows={3}
+                  value={inspectionNotes}
+                  onChange={(e) => setInspectionNotes(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200"
+                  placeholder="Record container seal serials, chemical VVM status, packaging conditions..."
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setVerifyModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleVerify}
+                disabled={generatingReport}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
+              >
+                {generatingReport ? 'Generating Reports...' : 'Confirm Verification & Generate Reports'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

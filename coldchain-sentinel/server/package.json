@@ -9,8 +9,13 @@
     "test": "jest --runInBand"
   },
   "nodemonConfig": {
-    "watch": ["src/"],
-    "ignore": ["data/*", "tests/*"]
+    "watch": [
+      "src/"
+    ],
+    "ignore": [
+      "data/*",
+      "tests/*"
+    ]
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -20,6 +25,7 @@
     "express-validator": "^7.2.0",
     "helmet": "^7.1.0",
     "morgan": "^1.10.0",
+    "pdfkit": "^0.20.2",
     "socket.io": "^4.7.5",
     "uuid": "^10.0.0"
   },
@@ -30,6 +36,8 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["**/tests/**/*.test.js"]
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
   }
 }

@@ -15,6 +15,7 @@ const alertsRoutes = require('./routes/alerts');
 const checkpointsRoutes = require('./routes/checkpoints');
 const analyticsRoutes = require('./routes/analytics');
 const simulatorRoutes = require('./routes/simulator');
+const reportsRoutes = require('./routes/reports');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 // Initialize store
@@ -51,6 +52,31 @@ app.use(express.json({ limit: '100kb' }));
 app.use(express.text({ type: ['text/plain', 'text/*', 'application/text'], limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
+// Root Health Check endpoint (Requirement 4: GET http://localhost:5001/health)
+app.get('/health', (req, res) => {
+  const dbHealth = store.checkHealth();
+  const isHealthy = dbHealth.available;
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'ok' : 'degraded',
+    message: isHealthy
+      ? 'ColdChain Sentinel backend is running with local SQLite persistence'
+      : 'Database unavailable',
+    port: config.port,
+    timestamp: new Date().toISOString(),
+    storage: {
+      type: 'sqlite',
+      available: dbHealth.available,
+      path: dbHealth.path,
+      sizeBytes: dbHealth.sizeBytes,
+      lastModified: dbHealth.lastModified,
+    },
+    services: {
+      database: dbHealth.available ? 'healthy' : 'unhealthy',
+      esp32: 'ready',
+    },
+  });
+});
+
 // Routes
 app.use('/api', healthRoutes);
 app.use('/api/readings', readingsRoutes);
@@ -59,6 +85,7 @@ app.use('/api/alerts', alertsRoutes);
 app.use('/api/checkpoints', checkpointsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/simulator', simulatorRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -68,6 +95,7 @@ app.get('/', (req, res) => {
     message: 'Backend is running',
   });
 });
+
 
 // Error handling
 app.use(notFound);
