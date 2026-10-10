@@ -1,0 +1,20 @@
+{
+  "dataSource": "esp32",
+  "esp32Host": "10.168.234.195",
+  "esp32Port": 80,
+  "esp32Path": "/shipment",
+  "staleReadingTimeout": 10000,
+  "maxReadingHistory": 500,
+  "alertEscalationRules": {
+    "minorToModerateMins": 5,
+    "moderateToCriticalMins": 15
+  },
+  "excursionThresholds": {
+    "tempMin": 2.0,
+    "tempMax": 8.0
+  },
+  "airQualityThresholds": {
+    "warningAqi": 100,
+    "criticalAqi": 150
+  }
+}
